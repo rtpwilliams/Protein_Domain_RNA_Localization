@@ -49,7 +49,7 @@ These are all the protein domains associated with "erm-1", "frm-7", and "imb-2"
 # protdomain_df %>% filter(wikigene_name == "frm-7")
 # protdomain_df %>% filter(interpro_short_description %in% c("PH_domain", "FERM_domain", "PH-like_dom_sf")) %>% group_by(interpro_short_description, interpro_description) %>% count()
 
-goi_domains <- protdomain_df %>% filter(wikigene_name %in% c("erm-1", "frm-7", "imb-2")) %>% group_by(wikigene_name, interpro_short_description, interpro_description) %>% count() %>% arrange(wikigene_name)
+goi_domains <- protdomain_df %>% filter(wikigene_name %in% c("erm-1")) %>% group_by(wikigene_name, interpro_short_description, interpro_description) %>% count() %>% arrange(wikigene_name)
 
 goi_domains
 ```
@@ -57,20 +57,20 @@ goi_domains
 
 ```{r}
 domain_hits <- protdomain_df %>% filter(interpro_short_description %in% goi_domains$interpro_short_description,
-  !(interpro_short_description %in% c("Ubiquitin-like_domsf", "ARM-like", "ARM-type_fold"))
+  !(interpro_short_description %in% c("Ubiquitin-like_domsf"))
   ) %>% 
   select(wbps_gene_id, wikigene_name, interpro_description, interpro_short_description) %>% 
   group_by(wbps_gene_id,wikigene_name, interpro_description, interpro_short_description) %>% 
   count(name = "domain_count") %>%
   ungroup()
-domain_hits
+head(domain_hits)
 length(unique(domain_hits$wbps_gene_id))
 ```
 
 
 ```{r}
 domain_hits_totals <- protdomain_df %>% filter(interpro_short_description %in% goi_domains$interpro_short_description,
-  !(interpro_short_description %in% c("Ubiquitin-like_domsf", "ARM-like", "ARM-type_fold"))
+  !(interpro_short_description %in% c("Ubiquitin-like_domsf"))
   ) %>%  group_by(interpro_short_description, interpro_description) %>% count(name = "domain_count") %>% ungroup() %>% arrange(desc(domain_count)) 
 domain_hits_totals
 ```
@@ -107,112 +107,7 @@ twocell_domains
 
 
 
-Make upset plot of genes in the `twocell_domains` list for the categories:
-"present", "AB_enriched", "P1_enriched" and "symmetric"
-
 ```{r}
-# remove duplicate gene names which had multiple protein domains
-class(twocell_domains)
-domain_upset <-
-  twocell_domains %>% 
-  # ungroup() %>% 
-  # filter(present == TRUE) %>%
-  select(wikigene_name, present:symmetric) %>% 
-  distinct(wikigene_name, .keep_all = TRUE) %>% 
-  column_to_rownames(var = "wikigene_name") 
-head(domain_upset)
-nrow(domain_upset)
-sum(domain_upset$present)
-sum(domain_upset$AB_enriched)
-sum(domain_upset$P1_enriched)
-sum(domain_upset$symmetric)
-```
-
-
-```{r}
-# replace TRUE/FALSE with 1/0
-domain_upset[, sapply(domain_upset, is.logical)] <-
-  lapply(domain_upset[, sapply(domain_upset, is.logical)], as.numeric)
-# convert to matrix
-domain_upset_matrix <- as.matrix.data.frame(domain_upset)
-# peek
-head(domain_upset_matrix)
-# number of rows
-nrow(domain_upset_matrix)
-```
-
-```{r}
-m <- make_comb_mat(domain_upset_matrix)
-m
-```
-
-Draw the UpSet plot
-```{r}
-col_size = comb_size(m)
-row_size = set_size(m)
-ht = UpSet(m, 
-	top_annotation = upset_top_annotation(m, ylim = c(0, max(col_size)*1.1)),
-	right_annotation = upset_right_annotation(m, ylim = c(0, max(row_size)*1.1)))
-ht = draw(ht)
-
-col_od = column_order(ht)
-row_od = row_order(ht)
-# This stuff adds numbers to the top of the bar plot
-decorate_annotation("Intersection\nsize", {
-	grid.text(col_size[col_od], 
-		seq_len(length(col_size)), 
-		unit(col_size[col_od], "native") + unit(2, "mm"), 
-		default.units = "native", just = "bottom",
-		gp = gpar(fontsize = 8))
-})
-decorate_annotation("Set size", {
-	grid.text(row_size[row_od], 
-		unit(row_size[row_od], "native") + unit(2, "mm"), 
-		rev(seq_len(length(row_size))), 
-		default.units = "native", just = "bottom", rot = -90,
-		gp = gpar(fontsize = 8))
-})
-
-
-```
-
-Of the 129 genes present with protein domains similar to erm-1, frm-7 or imb-2:  
-- 64 are symmetric
-- 6 are AB enriched
-- 59 are not significantly differentially expressed
-- 20 are not detected in the 2 cell embryo dataset
-
-Additionally, 0 genes are identified to be P1 enriched
-
-Uncomment and run the entire chunk to export the plot
-```{r}
-# pdf(file = "Protein_Domains_2-Cell_Embryo_Upset_Plot.pdf", width = 5, height = 5)
-# ht = draw(ht)
-# 
-# col_od = column_order(ht)
-# row_od = row_order(ht)
-# 
-# decorate_annotation("Intersection\nsize", {
-# 	grid.text(col_size[col_od], 
-# 		seq_len(length(col_size)), 
-# 		unit(col_size[col_od], "native") + unit(2, "mm"), 
-# 		default.units = "native", just = "bottom",
-# 		gp = gpar(fontsize = 8))
-# })
-# decorate_annotation("Set size", {
-# 	grid.text(row_size[row_od], 
-# 		unit(row_size[row_od], "native") + unit(2, "mm"), 
-# 		rev(seq_len(length(row_size))), 
-# 		default.units = "native", just = "bottom", rot = -90,
-# 		gp = gpar(fontsize = 8))
-# })
-# dev.off()
-```
-
-
-```{r}
-twocell_domains
-
 twocell_domain_genes <- twocell_domains %>% mutate(gene_type = case_when(
   present == TRUE & symmetric == FALSE & AB_enriched == FALSE ~ "no_sig_dif",
   present == TRUE & symmetric == TRUE ~ "symmetric",
@@ -237,8 +132,27 @@ Get the names of AB enriched genes
 unique((twocell_domain_genes %>% filter(gene_type == "AB_enriched"))$wikigene_name)
 ```
 
-Output the data.
+Get the names of symmetric enriched genes
+
 ```{r}
-write.xlsx(twocell_domain_genes, file = "Protein_Domains_2-Cell_Embryo_Genes_210310.xlsx")
+unique((twocell_domain_genes %>% filter(gene_type == "symmetric"))$wikigene_name)
 ```
 
+Total number of genes
+
+```{r}
+twocell_domain_genes %>% distinct(wbps_gene_id) %>% nrow()
+```
+
+
+Output the list of protein domains
+
+```{r}
+write.xlsx(twocell_domain_genes %>% select(wbps_gene_id:domain_count), file = "Protein_Domains_2-Cell_Embryo_Genes_220429.xlsx")
+```
+
+Output the list of genes with 2 cell data annotation
+
+```{r}
+write.xlsx(twocell_domain_genes %>% select(wbps_gene_id, wikigene_name, AB_vs_P1 = gene_type) %>% distinct(wbps_gene_id, .keep_all = TRUE), file = "Domain_Search_2-Cell_Embryo_Genes_220429.xlsx")
+```
